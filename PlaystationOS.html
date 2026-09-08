@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusStream OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        ps: {
+                            dark: '#0a0a0a',
+                            panel: 'rgba(20, 20, 20, 0.65)',
+                            blue: '#2e6db4'
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden; /* App-like feel */
+        }
+
+        /* Hide scrollbar for carousel but allow scrolling */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .glass-panel {
+            background: rgba(15, 15, 15, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tile-active {
+            transform: translateY(-4px) scale(1.1);
+            border: 3px solid #fff;
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+
+        .tile-inactive {
+            transform: scale(0.95);
+            opacity: 0.7;
+            border: 3px solid transparent;
+        }
+        
+        .tile-inactive:hover {
+            opacity: 1;
+            transform: scale(1.0);
+        }
+
+        .tile-transition {
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* Subtle vignette for the background */
+        .bg-vignette {
+            background: radial-gradient(circle, transparent 20%, #000 120%);
+        }
+
+        .bg-fade-transition {
+            transition: opacity 0.4s ease-in-out, transform 10s linear;
+        }
+    </style>
+</head>
+
+<body class="w-screen h-screen flex flex-col selection:bg-white selection:text-black">
+
+    <!-- Dynamic Fullscreen Background -->
+    <div id="app-bg" class="fixed inset-0 bg-cover bg-center bg-fade-transition z-0 scale-105 transform origin-center" style="background-image: url('https://placehold.co/1920x1080/000000/000000');"></div>
+    <div class="fixed inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent z-0"></div>
+    <div class="fixed inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent z-0 pointer-events-none"></div>
+    <div class="fixed inset-0 bg-vignette z-0 pointer-events-none opacity-60"></div>
+
+    <!-- Main OS Interface -->
+    <div id="os-interface" class="relative z-10 flex flex-col h-full w-full pt-8 pb-12 px-12 transition-opacity duration-300">
+        
+        <!-- Top Navigation Bar -->
+        <header class="flex items-center justify-between shrink-0 z-20">
+            <!-- Left: Games / Media -->
+            <div class="flex items-center space-x-8 text-xl font-light">
+                <button class="text-white border-b-2 border-white pb-1 tracking-wide">Games</button>
+                <button class="text-white/50 hover:text-white transition-colors tracking-wide">Media</button>
+            </div>
+
+            <!-- Right: System Icons -->
+            <div class="flex items-center space-x-6 text-white/70">
+                <button onclick="showSearch()" class="hover:text-white hover:scale-110 transition-all">
+                    <i class="fa-solid fa-magnifying-glass text-lg"></i>
+                </button>
+                <button onclick="toggleSettingsModal()" class="hover:text-white hover:scale-110 transition-all">
+                    <i class="fa-solid fa-gear text-lg"></i>
+                </button>
+                <div class="flex items-center space-x-3 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg">
+                    <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-[10px] text-white font-bold shadow-inner">
+                        P1
+                    </div>
+                    <span id="os-time" class="text-sm font-medium text-white">12:00 PM</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Horizontal Game Carousel (Moved Top) -->
+        <div class="shrink-0 relative mt-8 z-20">
+            <div id="game-carousel" class="flex overflow-x-auto space-x-4 pb-8 pt-4 px-2 snap-x no-scrollbar items-end h-[160px]">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Dynamic Game Hero Section (Moved Bottom) -->
+        <div class="flex-1 flex flex-col justify-end max-w-3xl mb-8 space-y-6 z-20 animate-fade-in" id="hero-section">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- Fullscreen Settings / Dashboard Overlay -->
+    <div id="system-menu" class="fixed inset-0 z-40 bg-ps-dark/95 backdrop-blur-2xl hidden flex-col transition-opacity duration-300">
+        <div class="flex items-center justify-between p-12 border-b border-white/5">
+            <div class="flex items-center space-x-6">
+                <button onclick="toggleSettingsModal()" class="w-12 h-12 rounded-full bg-white/10 hover:bg-white flex items-center justify-center text-white hover:text-black transition-all shadow-lg">
+                    <i class="fa-solid fa-arrow-left text-xl"></i>
+                </button>
+                <h2 class="text-3xl font-light tracking-wide">System Settings</h2>
+            </div>
+            <button onclick="toggleSettingsModal()" class="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xl transition-all">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Settings Sidebar -->
+            <div class="w-80 border-r border-white/5 p-6 space-y-2 overflow-y-auto">
+                <button onclick="switchSettingsTab('network')" class="w-full text-left px-6 py-4 rounded-xl hover:bg-white/10 focus:bg-white/20 transition-all font-medium flex items-center space-x-4 group">
+                    <i class="fa-solid fa-globe text-white/50 group-hover:text-white"></i>
+                    <span>Network & Servers</span>
+                </button>
+                <button onclick="switchSettingsTab('display')" class="w-full text-left px-6 py-4 rounded-xl hover:bg-white/10 focus:bg-white/20 transition-all font-medium flex items-center space-x-4 group">
+                    <i class="fa-solid fa-display text-white/50 group-hover:text-white"></i>
+                    <span>Screen & Video</span>
+                </button>
+                <button onclick="switchSettingsTab('library')" class="w-full text-left px-6 py-4 rounded-xl hover:bg-white/10 focus:bg-white/20 transition-all font-medium flex items-center space-x-4 group">
+                    <i class="fa-solid fa-gamepad text-white/50 group-hover:text-white"></i>
+                    <span>Storage & Library</span>
+                </button>
+            </div>
+
+            <!-- Settings Content -->
+            <div class="flex-1 p-12 overflow-y-auto">
+                
+                <!-- Network Tab -->
+                <div id="tab-network" class="space-y-8">
+                    <h3 class="text-2xl font-light">Network Connectivity</h3>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="glass-panel p-8 rounded-2xl space-y-4">
+                            <div class="text-sm text-white/50">Current Node</div>
+                            <div id="settings-node-name" class="text-2xl font-semibold">US-East</div>
+                            <div class="text-sm text-emerald-400">Status: Connected</div>
+                        </div>
+                        <div class="glass-panel p-8 rounded-2xl space-y-4 flex flex-col justify-between">
+                            <div>
+                                <div class="text-sm text-white/50">Connection Status</div>
+                                <div id="settings-ping" class="text-2xl font-semibold mt-1">14ms Ping</div>
+                            </div>
+                            <button onclick="runNetworkTest()" id="test-btn" class="w-full py-3 bg-white text-black font-semibold rounded-full hover:bg-gray-200 transition-colors">Test Internet Connection</button>
+                        </div>
+                    </div>
+                    <div class="space-y-4 mt-8">
+                        <h4 class="text-lg font-medium text-white/70">Available Nodes</h4>
+                        <div id="server-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Display Tab -->
+                <div id="tab-display" class="space-y-8 hidden">
+                    <h3 class="text-2xl font-light">Screen & Video Output</h3>
+                    <div class="glass-panel p-8 rounded-2xl space-y-6 max-w-2xl">
+                        <div class="space-y-3">
+                            <label class="block text-sm text-white/50 uppercase tracking-wider">Resolution & Refresh Rate</label>
+                            <select id="setting-res" onchange="handleResolutionChange(this)" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-base focus:outline-none focus:border-white transition-colors cursor-pointer appearance-none">
+                                <option class="bg-ps-dark text-white" value="1080p @ 30FPS">1080p (Standard)</option>
+                                <option class="bg-ps-dark text-white" value="1080p @ 60FPS" selected>1080p @ 60FPS (Smooth)</option>
+                                <option class="bg-ps-dark text-white" value="1440p @ 120FPS">1440p @ 120FPS (Performance)</option>
+                                <option class="bg-ps-dark text-white" value="4K @ 165FPS">4K @ 165FPS (Fidelity + Frame Unlock)</option>
+                            </select>
+                        </div>
+                        <div class="space-y-3">
+                            <label class="block text-sm text-white/50 uppercase tracking-wider">Hardware Codec</label>
+                            <select class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-base focus:outline-none focus:border-white transition-colors cursor-pointer appearance-none">
+                                <option class="bg-ps-dark text-white">AV1 Engine (Recommended)</option>
+                                <option class="bg-ps-dark text-white">H.265 / HEVC</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Library Tab -->
+                <div id="tab-library" class="space-y-8 hidden">
+                    <h3 class="text-2xl font-light">Console Storage</h3>
+                    <div class="w-full h-4 bg-white/10 rounded-full overflow-hidden">
+                        <div class="w-3/4 h-full bg-white rounded-full"></div>
+                    </div>
+                    <div class="flex justify-between text-sm text-white/50">
+                        <span>Used: 620 GB</span>
+                        <span>Free: 205 GB</span>
+                    </div>
+                    
+                    <div class="mt-8 space-y-4">
+                        <h4 class="text-lg font-medium text-white/70">Installed Cloud Licenses</h4>
+                        <div id="library-list" class="space-y-3">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- FPS Unlock Modal (Styled like system auth) -->
+    <div id="password-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-[#1a1a1a] max-w-md w-full rounded-2xl border border-white/10 p-8 space-y-6 shadow-2xl">
+            <h4 class="font-light text-2xl">Passcode Required</h4>
+            <p class="text-sm text-white/50">Enter the system passcode to unlock ultra-high refresh rates (165FPS+).</p>
+            <input type="password" id="fps-password" class="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-4 text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-white transition-colors" autocomplete="off">
+            <div class="flex space-x-3 pt-4">
+                <button onclick="cancelPasswordModal()" class="flex-1 py-3 rounded-full bg-white/10 hover:bg-white/20 font-medium transition-colors">Cancel</button>
+                <button onclick="verifyFpsPassword()" class="flex-1 py-3 rounded-full bg-white text-black font-semibold hover:bg-gray-200 transition-colors">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rockstar Auth Modal -->
+    <div id="rockstar-auth-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-[#1a1a1a] max-w-md w-full rounded-2xl border border-white/10 p-8 space-y-6 shadow-2xl text-center">
+            <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-2">
+                <i class="fa-solid fa-shield-check text-3xl"></i>
+            </div>
+            <h4 class="font-light text-2xl">Checking License</h4>
+            <p id="rockstar-game-notice" class="text-sm text-white/50">Verifying cloud ownership...</p>
+            
+            <div class="w-full bg-white/10 h-1 rounded-full overflow-hidden my-6">
+                <div class="bg-white h-full w-1/2 animate-pulse rounded-full"></div>
+            </div>
+
+            <div class="flex space-x-3">
+                <button onclick="closeRockstarModal()" class="flex-1 py-3 rounded-full bg-white/10 hover:bg-white/20 font-medium transition-colors">Cancel</button>
+                <button onclick="completeRockstarAuth()" class="flex-1 py-3 rounded-full bg-white text-black font-semibold hover:bg-gray-200 transition-colors">Start Anyway</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cloud Streaming Interface -->
+    <div id="stream-overlay" class="fixed inset-0 z-50 bg-black hidden flex-col">
+        <!-- Minimal HUD (Appears briefly or on hover) -->
+        <div class="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/90 to-transparent flex items-start justify-between px-8 py-6 z-20 transition-opacity duration-300">
+            <div class="flex items-center space-x-4">
+                <button onclick="exitStream()" class="px-5 py-2.5 rounded-full bg-white/10 hover:bg-white flex items-center justify-center text-white hover:text-black transition-colors backdrop-blur-md space-x-2 font-medium border border-white/20 hover:border-white shadow-xl">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Back</span>
+                </button>
+                <button onclick="togglePauseMenu()" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white flex items-center justify-center text-white hover:text-black transition-colors backdrop-blur-md shadow-lg">
+                    <i class="fa-brands fa-playstation text-xl"></i>
+                </button>
+                <div class="pl-2">
+                    <h2 id="stream-game-title" class="font-medium text-lg text-white/90 leading-tight">Game Title</h2>
+                    <p class="text-xs text-white/50">Cloud Session Active</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-6 text-sm font-medium text-white/50">
+                <span>FPS: <strong id="hud-fps" class="text-white">60</strong></span>
+                <span>Ping: <strong id="hud-ping" class="text-white">14ms</strong></span>
+            </div>
+        </div>
+
+        <div id="stream-container-wrapper" class="flex-1 relative w-full h-full bg-black">
+            <iframe id="game-iframe" class="w-full h-full border-0" allowfullscreen></iframe>
+            
+            <!-- In-Stream Pause Menu (System UI Overlay) -->
+            <div id="stream-pause-menu" class="absolute inset-0 bg-black/60 backdrop-blur-xl hidden flex-col items-center justify-center z-30">
+                <div class="max-w-sm w-full space-y-2">
+                    <button onclick="resumeStream()" class="w-full py-4 text-left px-8 rounded-xl bg-white text-black font-semibold text-lg hover:scale-105 transition-all">Resume Activity</button>
+                    <button onclick="restartActiveGame()" class="w-full py-4 text-left px-8 rounded-xl bg-white/10 text-white font-medium hover:bg-white/20 transition-all">Restart Game</button>
+                    <button onclick="exitStream()" class="w-full py-4 text-left px-8 rounded-xl bg-white/10 text-white font-medium hover:bg-white/20 hover:text-red-400 transition-all">Close Game</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed top-8 right-8 z-50 transform -translate-y-4 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="glass-panel px-6 py-4 rounded-2xl flex items-center space-x-4">
+            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                <i class="fa-solid fa-info text-white"></i>
+            </div>
+            <span id="toast-msg" class="text-sm font-medium">Notification</span>
+        </div>
+    </div>
+
+    <script>
+        const servers = [
+            { id: 'us_east', name: 'US-East', region: 'Virginia', ping: 14, status: 'Optimal' },
+            { id: 'us_west', name: 'US-West', region: 'Oregon', ping: 48, status: 'Good' },
+            { id: 'eu_central', name: 'EU-Central', region: 'Frankfurt', ping: 86, status: 'Good' }
+        ];
+
+        const games = [
+            {
+                id: 'balatro_modded',
+                title: 'Balatro Modded',
+                developer: 'LocalThunk / Community',
+                bgImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2379780/page_bg_generated_v6b.jpg',
+                coverImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2379780/library_600x900_2x.jpg',
+                logoImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2379780/logo.png',
+                desc: 'The ultimate modded version of the rogue-like poker deck builder. Experience community custom jokers and game-breaking synergies.',
+                webUrl: 'https://clever.pbseducation1914.org/games/balatromodded/main/',
+                requiresAuth: false
+            },
+            {
+                id: 'tungtung',
+                title: 'Tung Tung Basics',
+                developer: 'Independent',
+                bgImage: 'https://images.gamebanana.com/img/ss/mods/6980be9508155.jpg',
+                coverImage: 'https://images.gamebanana.com/img/ss/mods/6980be9508155.jpg',
+                logoImage: '',
+                desc: 'A hilarious and chaotic educational survival challenge full of unexpected twists and fast-paced school hallways.',
+                webUrl: 'https://clever.pbseducation1914.org/games/tungtungbog/index.html',
+                requiresAuth: false
+            },
+            {
+                id: 'celeste',
+                title: 'Celeste',
+                developer: 'Extremely OK Games',
+                bgImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/504230/page_bg_generated_v6b.jpg',
+                coverImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/504230/library_600x900_2x.jpg',
+                logoImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/504230/logo.png',
+                desc: 'Help Madeline survive her inner demons on her journey to the top of Celeste Mountain in this super-tight platformer.',
+                webUrl: 'https://clever.pbseducation1914.org/games/celeste/index.html',
+                requiresAuth: false
+            },
+            {
+                id: 'cuphead',
+                title: 'Cuphead',
+                developer: 'Studio MDHR',
+                bgImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/268910/page_bg_generated_v6b.jpg',
+                coverImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/268910/library_600x900_2x.jpg',
+                logoImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/268910/logo.png',
+                desc: 'A classic run and gun action game heavily focused on boss battles, inspired by cartoons of the 1930s.',
+                webUrl: 'https://clever.pbseducation1914.org/games/Cuphead/index.html',
+                requiresAuth: false
+            },
+            {
+                id: 'gta_vc',
+                title: 'Grand Theft Auto: Vice City',
+                developer: 'Rockstar Games',
+                bgImage: 'https://upload.wikimedia.org/wikipedia/en/c/ce/Vice-city-cover.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original',
+                coverImage: 'https://upload.wikimedia.org/wikipedia/en/c/ce/Vice-city-cover.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original',
+                logoImage: '',
+                desc: 'Welcome to the 1980s. From the decade of big hair, excess and pastel suits comes a story of one man\'s rise to the top of the criminal pile.',
+                webUrl: 'https://clever.pbseducation1914.org/games/vicecity/index.html',
+                requiresAuth: true
+            },
+            {
+                id: 'subway_surfers',
+                title: 'Subway Surfers',
+                developer: 'SYBO Games',
+                bgImage: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfyjATFe7Qg15j5x1YktUbABxgr6BlbKXKECbj6KH2QzbgKqzw',
+                coverImage: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfyjATFe7Qg15j5x1YktUbABxgr6BlbKXKECbj6KH2QzbgKqzw',
+                logoImage: '',
+                desc: 'Dodge the grumpy inspector and his dog! Dash as fast as you can, jump over trains, and collect coins in this endless runner classic.',
+                webUrl: 'https://clever.pbseducation1914.org/games/subway-surfers/index.html',
+                requiresAuth: false
+            },
+            {
+                id: 'geometry_dash',
+                title: 'Geometry Dash',
+                developer: 'RobTop Games',
+                bgImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/322170/page_bg_generated_v6b.jpg',
+                coverImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/322170/library_600x900_2x.jpg',
+                logoImage: 'https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/322170/logo.png',
+                desc: 'Jump and fly your way through danger in this rhythm-based action platformer. Prepare for a near impossible challenge.',
+                webUrl: 'https://clever.pbseducation1914.org/gamefile/gd.html',
+                requiresAuth: false
+            },
+            {
+                id: 'roblox',
+                title: 'Roblox',
+                developer: 'Roblox Corporation',
+                bgImage: 'https://assets-prd.ignimgs.com/2024/09/06/roblox-rdc2024-everythingannounced-blogroll-1725644119427.jpg?width=1312&format=jpg&auto=webp&quality=80',
+                coverImage: 'https://m.media-amazon.com/images/I/21aoUPG3svL.png',
+                logoImage: '',
+                desc: 'Immerse yourself in millions of interactive 3D experiences, games, and virtual worlds created by a global community.',
+                webUrl: 'https://nowgg.fun/apps/a/19900/b.html',
+                requiresAuth: false
+            }
+        ];
+
+        let focusedGameId = games[0].id;
+        let activeServer = servers[0];
+        let targetFps = 60;
+        let pendingGameLaunch = null;
+
+        window.onload = function() {
+            updateClock();
+            setInterval(updateClock, 10000);
+            renderCarousel();
+            renderSettingsServers();
+            renderSettingsLibrary();
+            focusGame(games[0].id);
+        };
+
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            document.getElementById('os-time').innerText = hours + ':' + minutes + ' ' + ampm;
+        }
+
+        function renderCarousel() {
+            const carousel = document.getElementById('game-carousel');
+            carousel.innerHTML = games.map((g) => `
+                <div id="tile-${g.id}" 
+                     class="relative w-24 h-24 md:w-28 md:h-28 shrink-0 rounded-[1.25rem] overflow-hidden cursor-pointer tile-transition tile-inactive bg-[#0f0f0f] group shadow-2xl"
+                     onmouseenter="focusGame('${g.id}')"
+                     onclick="launchGame('${g.id}')">
+                    <img src="${g.coverImage}" class="absolute inset-0 w-full h-full object-cover z-10 transition-transform duration-700 group-hover:scale-110" alt="${g.title}">
+                </div>
+            `).join('');
+            
+            carousel.addEventListener('wheel', (evt) => {
+                evt.preventDefault();
+                carousel.scrollLeft += evt.deltaY;
+            });
+        }
+
+        function focusGame(id) {
+            if (focusedGameId === id) return;
+            focusedGameId = id;
+            const game = games.find(g => g.id === id);
+
+            games.forEach(g => {
+                const tile = document.getElementById(`tile-${g.id}`);
+                if(g.id === id) {
+                    tile.classList.remove('tile-inactive');
+                    tile.classList.add('tile-active');
+                    tile.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                } else {
+                    tile.classList.remove('tile-active');
+                    tile.classList.add('tile-inactive');
+                }
+            });
+
+            const bg = document.getElementById('app-bg');
+            bg.style.opacity = '0';
+            setTimeout(() => {
+                bg.style.backgroundImage = `url('${game.bgImage}')`;
+                bg.style.opacity = '1';
+                bg.style.transform = 'scale(1.08)';
+                setTimeout(() => { bg.style.transform = 'scale(1.05)'; }, 50);
+            }, 300);
+
+            const hero = document.getElementById('hero-section');
+            hero.innerHTML = `
+                <div class="animate-slide-up space-y-6">
+                    ${game.logoImage 
+                        ? `<img src="${game.logoImage}" alt="${game.title}" class="h-20 md:h-28 object-contain origin-bottom-left filter drop-shadow-2xl">` 
+                        : `<h1 class="text-5xl md:text-7xl font-bold tracking-tight text-white drop-shadow-2xl">${game.title}</h1>`
+                    }
+                    <p class="text-sm md:text-base text-white/90 max-w-xl leading-relaxed drop-shadow-lg font-medium">${game.desc}</p>
+                    <div class="pt-4 flex items-center space-x-4">
+                        <button onclick="launchGame('${game.id}')" class="px-12 py-4 rounded-full bg-white text-black font-bold text-lg hover:scale-105 hover:bg-gray-200 transition-all flex items-center space-x-3 shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+                            <i class="fa-solid fa-play text-sm"></i>
+                            <span>Play</span>
+                        </button>
+                        <button class="w-14 h-14 rounded-full bg-black/40 hover:bg-black/60 border border-white/20 flex items-center justify-center text-white transition-all backdrop-blur-md hover:scale-105 shadow-xl">
+                            <i class="fa-solid fa-ellipsis"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleSettingsModal() {
+            const modal = document.getElementById('system-menu');
+            const mainUI = document.getElementById('os-interface');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                mainUI.style.opacity = '0';
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                mainUI.style.opacity = '1';
+            }
+        }
+
+        function switchSettingsTab(tabId) {
+            ['network', 'display', 'library'].forEach(id => {
+                const el = document.getElementById(`tab-${id}`);
+                if(id === tabId) {
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+        }
+
+        function renderSettingsServers() {
+            const list = document.getElementById('server-list');
+            list.innerHTML = servers.map(s => `
+                <div onclick="selectServer('${s.id}')" class="p-6 rounded-2xl border ${activeServer.id === s.id ? 'border-white bg-white/10' : 'border-white/10 hover:bg-white/5'} cursor-pointer transition-colors space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="font-medium text-white">${s.name} (${s.region})</span>
+                        ${activeServer.id === s.id ? '<i class="fa-solid fa-check text-white"></i>' : ''}
+                    </div>
+                    <div class="text-sm text-white/50">Ping: ${s.ping}ms</div>
+                </div>
+            `).join('');
+        }
+
+        function renderSettingsLibrary() {
+            const list = document.getElementById('library-list');
+            list.innerHTML = games.map(g => `
+                <div class="flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/10">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-gamepad text-white/50"></i>
+                        </div>
+                        <div>
+                            <div class="font-medium text-white">${g.title}</div>
+                            <div class="text-xs text-white/50">Cloud Sync Active</div>
+                        </div>
+                    </div>
+                    <span class="text-sm text-white/50">45.2 GB (Virtual)</span>
+                </div>
+            `).join('');
+        }
+
+        function selectServer(id) {
+            activeServer = servers.find(s => s.id === id);
+            renderSettingsServers();
+            document.getElementById('settings-node-name').innerText = activeServer.name;
+            document.getElementById('settings-ping').innerText = `${activeServer.ping}ms Ping`;
+            document.getElementById('hud-ping').innerText = `${activeServer.ping}ms`;
+            showToast(`Network switched to ${activeServer.name}`);
+        }
+
+        function handleResolutionChange(selectEl) {
+            const val = selectEl.value;
+            if (val.includes('165FPS')) {
+                document.getElementById('password-modal').classList.remove('hidden');
+            } else {
+                targetFps = val.includes('120FPS') ? 120 : (val.includes('30FPS') ? 30 : 60);
+                showToast(`Display updated to ${val}`);
+            }
+        }
+
+        function cancelPasswordModal() {
+            document.getElementById('password-modal').classList.add('hidden');
+            document.getElementById('setting-res').value = '1080p @ 60FPS';
+            document.getElementById('fps-password').value = '';
+        }
+
+        function verifyFpsPassword() {
+            const pwd = document.getElementById('fps-password').value;
+            if (pwd === 'darrenmakesthebestwebsites') {
+                targetFps = 165;
+                document.getElementById('password-modal').classList.add('hidden');
+                document.getElementById('fps-password').value = '';
+                showToast('High refresh rate unlocked successfully!');
+            } else {
+                showToast('Incorrect passcode.');
+                cancelPasswordModal();
+            }
+        }
+
+        function launchGame(id) {
+            const game = games.find(x => x.id === id);
+            if (!game) return;
+
+            if (game.requiresAuth) {
+                pendingGameLaunch = game;
+                document.getElementById('rockstar-game-notice').innerText = `Verifying license for ${game.title}...`;
+                document.getElementById('rockstar-auth-modal').classList.remove('hidden');
+                return;
+            }
+            startStreamExecution(game);
+        }
+
+        function closeRockstarModal() {
+            document.getElementById('rockstar-auth-modal').classList.add('hidden');
+            pendingGameLaunch = null;
+        }
+
+        function completeRockstarAuth() {
+            document.getElementById('rockstar-auth-modal').classList.add('hidden');
+            if (pendingGameLaunch) {
+                startStreamExecution(pendingGameLaunch);
+                pendingGameLaunch = null;
+            }
+        }
+
+        function startStreamExecution(game) {
+            document.getElementById('stream-game-title').innerText = game.title;
+            document.getElementById('hud-fps').innerText = targetFps;
+            document.getElementById('hud-ping').innerText = `${activeServer.ping}ms`;
+            
+            const overlay = document.getElementById('stream-overlay');
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            
+            const iframe = document.getElementById('game-iframe');
+            iframe.src = game.webUrl;
+
+            document.getElementById('stream-pause-menu').classList.add('hidden');
+            document.getElementById('stream-pause-menu').classList.remove('flex');
+            
+            showToast(`Starting ${game.title}...`);
+        }
+
+        function togglePauseMenu() {
+            const menu = document.getElementById('stream-pause-menu');
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                menu.classList.add('flex');
+            } else {
+                menu.classList.add('hidden');
+                menu.classList.remove('flex');
+            }
+        }
+
+        function resumeStream() {
+            document.getElementById('stream-pause-menu').classList.add('hidden');
+            document.getElementById('stream-pause-menu').classList.remove('flex');
+        }
+
+        function restartActiveGame() {
+            resumeStream();
+            const iframe = document.getElementById('game-iframe');
+            const currentSrc = iframe.src;
+            iframe.src = '';
+            setTimeout(() => { iframe.src = currentSrc; }, 100);
+            showToast('Game restarted.');
+        }
+
+        function exitStream() {
+            const overlay = document.getElementById('stream-overlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            document.getElementById('game-iframe').src = '';
+            resumeStream();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('-translate-y-4', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-4', 'opacity-0');
+            }, 3000);
+        }
+
+        function runNetworkTest() {
+            const btn = document.getElementById('test-btn');
+            const originalText = btn.innerText;
+            btn.innerText = 'Testing...';
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+                showToast('Connection is optimal for streaming.');
+            }, 2000);
+        }
+
+        function showSearch() {
+            showToast("Search overlay not implemented in this demo.");
+        }
+    </script>
+</body>
+</html>
